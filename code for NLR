@@ -140,7 +140,7 @@ attach(work)
 library("survival")
 
 
-
+#dfs curve
 fit<-survfit(Surv(DFS,st1)~group,data=work)
 
 d<-data.frame(time=fit$time, n.risk=fit$n.risk,
@@ -163,6 +163,28 @@ ggsurvplot(fit, data = d,
            xlab="Time (Months)",
            legend.labs = c("NLR-L","NLR-M","NLR-H"))
 
+#os survival curve
+fit<-survfit(Surv(OS,st2)~group,data=work)
+
+d<-data.frame(time=fit$time, n.risk=fit$n.risk,
+              n.event=fit$n.event, n.censor=fit$n.censor,
+              surv=fit$surv,upper=fit$upper, lower=fit$lower)
+
+head(d)
+
+library("survminer")
+ggsurvplot(fit, data = d,
+           #conf.int = TRUE,
+           pval = TRUE,
+           fun = "pct",
+           risk.table = TRUE,
+           size = 2,
+           linetype = "solid",
+           palette = c(rgb(5,190,120,maxColorValue = 255),rgb(15,153,178,maxColorValue = 255),rgb(255,0,0,maxColorValue = 255)),
+           legend = "top",
+           legend.title = "Group",
+           xlab="Time (Months)",
+           legend.labs = c("NLR-L","NLR-M","NLR-H"))
 
 
 
