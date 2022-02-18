@@ -1,0 +1,170 @@
+#code for running mRMRe
+library(mRMRe)
+data<-read.csv('C:/Users/training.csv',header=T)
+feature_num = ncol(data) - 1
+train_feature = data[,0:feature_num] 
+train_label = data[,ncol(data)]
+mrmr_feature<-train_feature
+mrmr_feature$y<-train_label
+target_indices = which(names(mrmr_feature)=='y')
+for (m in which(sapply(mrmr_feature, class)!="numeric")){mrmr_feature[,m]=as.numeric(unlist(mrmr_feature[,m]))}
+Data <- mRMR.data(data = data.frame(mrmr_feature))
+mrmr=mRMR.ensemble(data = Data, target_indices = target_indices, 
+                   feature_count = 150, solution_count = 1)
+index=mrmr@filters[[as.character(mrmr@target_indices)]]
+new_data <- nrow(data):ncol(index)
+dim(new_data) <- c(nrow(data),ncol(index))
+new_data = data[,index]
+new_data_0 = cbind(new_data,train_label)
+write.csv (new_data_0,"C:/Users/features for lasso.csv",row.names = F)
+
+
+
+
+#code for running lasso
+
+
+library(glmnet)
+library(survival)
+library(foreign)
+set.seed(12345)
+bc <- read.spss("C:/Users/features for lasso.sav",
+                use.value.labels=F, to.data.frame=T)
+bc <- na.omit(bc)
+y<-as.matrix(bc[,148])
+x<-as.matrix(bc[,1:147])
+f1 = glmnet(x, y, family="multinomial", nlambda=100, alpha=1)
+print(f1)
+plot(f1, xvar="lambda", label=TRUE)
+cvfit=cv.glmnet(x,y)
+plot(cvfit)
+cvfit$lambda.min
+cvfit$lambda.1se
+log(cvfit$lambda.min)
+
+#after running the above code，run the following code
+
+l.coef2<-coef(cvfit$glmnet.fit,s=cvfit$lambda.min,exact = F)
+l.coef2
+
+
+
+
+
+
+
+#code for roc curve
+
+library(foreign)
+
+work=read.spss("work.sav",to.data.frame=TRUE)
+
+attach(work)
+
+library("pROC")  
+
+roc1 <- roc(work$NLR, work$RS)   
+
+
+plot(roc1, col="firebrick1",lwd=5)  
+
+
+
+
+
+
+
+
+
+#code for nomogram
+#dfs nomogram
+library(foreign)
+library(rms)
+gastric<-read.spss("DFS nomogram.sav")
+gastric<-as.data.frame(gastric)
+gastric<-na.omit(gastric)
+head(gastric)
+gastric$Status<-ifelse(gastric$Status=="1",1,0)
+coxm <-cph(Surv(Months,Status==1)~RS+pT+pN+pM,x=T,y=T,data=gastric,surv=T)
+surv<- Survival(coxm) 
+surv1<- function(x)surv(1*12,lp=x) 
+surv2<- function(x)surv(1*36,lp=x) 
+surv3<- function(x)surv(1*60,lp=x) 
+dd<-datadist(gastric) 
+options(datadist='dd')
+plot(nomogram(coxm,fun=list(surv1,surv2,surv3),lp=F,funlabel=c("1-Year DFS", '3-Year DFS','5-Year DFS'),maxscale=100,fun.at=c('0.95','0.90','0.80','0.70','0.6','0.5','0.4','0.3','0.2','0.1')),xfrac=.3)
+
+#caculating c-index
+f<-coxph(Surv(Months,Status==1)~RS+pT+pN+pM,data=gastric)
+sum.surv<-summary(f)
+c_index1<-sum.surv$concordance
+c_index1
+
+#os nomogram
+library(foreign)
+library(rms)
+gastric<-read.spss("OS nomogram.sav")
+gastric<-as.data.frame(gastric)
+gastric<-na.omit(gastric)
+head(gastric)
+gastric$Status<-ifelse(gastric$Status=="1",1,0)
+coxm <-cph(Surv(Months,Status==1)~RS+pT+pN,x=T,y=T,data=gastric,surv=T)
+surv<- Survival(coxm) 
+surv1<- function(x)surv(1*12,lp=x) 
+surv2<- function(x)surv(1*36,lp=x) 
+surv3<- function(x)surv(1*60,lp=x) 
+dd<-datadist(gastric) 
+options(datadist='dd')
+plot(nomogram(coxm,fun=list(surv1,surv2,surv3),lp=F,funlabel=c("1-Year OS", '3-Year OS','5-Year OS'),maxscale=100,fun.at=c('0.95','0.90','0.80','0.70','0.6','0.5','0.4','0.3','0.2','0.1')),xfrac=.3)
+
+#caculating c-index
+f<-coxph(Surv(Months,Status==1)~RS+pT+pN,data=gastric)
+sum.surv<-summary(f)
+c_index1<-sum.surv$concordance
+c_index1
+
+
+
+
+
+
+#code for survival curve
+
+library(foreign)
+
+
+work=read.spss("training survival curve.sav",to.data.frame=TRUE)
+
+attach(work)
+
+library("survival")
+
+
+
+fit<-survfit(Surv(DFS,st1)~group,data=work)
+
+d<-data.frame(time=fit$time, n.risk=fit$n.risk,
+              n.event=fit$n.event, n.censor=fit$n.censor,
+              surv=fit$surv,upper=fit$upper, lower=fit$lower)
+
+head(d)
+
+library("survminer")
+ggsurvplot(fit, data = d,
+           #conf.int = TRUE,
+           pval = TRUE,
+           fun = "pct",
+           risk.table = TRUE,
+           size = 2,
+           linetype = "solid",
+           palette = c(rgb(5,190,120,maxColorValue = 255),rgb(15,153,178,maxColorValue = 255),rgb(255,0,0,maxColorValue = 255)),
+           legend = "top",
+           legend.title = "Group",
+           xlab="Time (Months)",
+           legend.labs = c("NLR-L","NLR-M","NLR-H"))
+
+
+
+
+
+
